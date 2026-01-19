@@ -1,0 +1,17 @@
+# 忽略数据集
+datasets/
+data/
+*.zip
+*.tar
+*.rar
+
+# 忽略模型权重和输出结果
+checkpoints/
+results/
+*.pth
+*.pt
+
+# 忽略系统文件
+__pycache__/
+.idea/
+.vscode/
