@@ -1,6 +1,4 @@
 # 忽略数据集
-datasets/
-data/
 *.zip
 *.tar
 *.rar
