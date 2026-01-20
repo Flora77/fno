@@ -45,6 +45,27 @@ config_dict = config.to_dict() if hasattr(config, 'to_dict') else asdict(config)
 # Distributed training setup
 device, is_logger = setup(config_dict)
 
+# Set up file logging to save terminal output
+if is_logger:
+    log_dir = Path("logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"train_{time.strftime('%Y%m%d_%H%M%S')}.log"
+    print(f"Logging output to {log_file}")
+    
+    class Tee:
+        def __init__(self, fname, mode="a"):
+            self.stdout = sys.stdout
+            self.file = open(fname, mode)
+        def write(self, message):
+            self.stdout.write(message)
+            self.file.write(message)
+            self.flush()
+        def flush(self):
+            self.stdout.flush()
+            self.file.flush()
+
+    sys.stdout = Tee(log_file)
+
 # WandB logging configuration
 if config. wandb.log and is_logger:
     try:
