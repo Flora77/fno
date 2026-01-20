@@ -1,0 +1,80 @@
+WandB login failed: [Errno 2] No such file or directory: '../config/wandb_api_key.txt'. Disabling WandB logging.
+============================================================
+SEA SURFACE ELEVATION PREDICTION - FNO TRAINING
+============================================================
+
+### CONFIGURATION ###
+Observation area: 640m x 640m
+Prediction area:  640m x 640m
+Grid size:  128 x 128
+Time step: 0.25s
+Input history: 10.0s (40 steps)
+Prediction horizon: 60.0s (240 steps)
+
+Model: tfno
+Fourier modes: [64, 64]
+Hidden channels: 256
+Layers: 4
+============================================================
+
+### MODEL ###
+TFNO(
+  (positional_embedding): GridEmbeddingND()
+  (domain_padding): DomainPadding()
+  (fno_blocks): FNOBlocks(
+    (convs): ModuleList(
+      (0-3): 4 x SpectralConv(
+        (weight): TuckerTensor(shape=(256, 256, 64, 33), rank=(206, 206, 51, 27))
+      )
+    )
+    (fno_skips): ModuleList(
+      (0-3): 4 x SoftGating()
+    )
+    (channel_mlp): ModuleList(
+      (0-3): 4 x ChannelMLP(
+        (fcs): ModuleList(
+          (0): Conv1d(256, 128, kernel_size=(1,), stride=(1,))
+          (1): Conv1d(128, 256, kernel_size=(1,), stride=(1,))
+        )
+      )
+    )
+    (channel_mlp_skips): ModuleList(
+      (0-3): 4 x SoftGating()
+    )
+    (norm): ModuleList(
+      (0-7): 8 x InstanceNorm()
+    )
+  )
+  (lifting): ChannelMLP(
+    (fcs): ModuleList(
+      (0): Conv1d(42, 512, kernel_size=(1,), stride=(1,))
+      (1): Conv1d(512, 256, kernel_size=(1,), stride=(1,))
+    )
+  )
+  (projection): ChannelMLP(
+    (fcs): ModuleList(
+      (0): Conv1d(256, 512, kernel_size=(1,), stride=(1,))
+      (1): Conv1d(512, 240, kernel_size=(1,), stride=(1,))
+    )
+  )
+)
+
+### OPTIMIZER:  AdamW ###
+Learning rate: 0.001
+Weight decay: 0.0001
+
+### SCHEDULER: CosineAnnealingLR ###
+
+### LOSS FUNCTIONS ###
+Training:  h1
+Evaluation: ['h1', 'l2']
+
+### MODEL PARAMETERS:   469,026,792 ###
+
+============================================================
+STARTING TRAINING
+============================================================
+
+No existing checkpoints found at checkpoints/sea_surface_resume. Starting from scratch.
+Training on 289 samples
+Testing on [73] samples         on resolutions ['sea_surface'].

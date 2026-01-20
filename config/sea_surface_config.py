@@ -15,7 +15,7 @@ from zencfg import ConfigBase
 class DataConfig(ConfigBase):
     """Data configuration for sea surface prediction."""
     folder: str = "~/neuraloperator/neuralop/data/train_data_mat"
-    n_train: int = 1000
+    n_train: int = 500
     n_test: int = 200
     batch_size: int = 4
     test_batch_size: int = 4
@@ -41,7 +41,7 @@ class ModelConfig(ConfigBase):
     # FNO architecture parameters
     n_modes: List[int] = [64, 64]  # Fourier modes
     hidden_channels: int = 128
-    n_layers: int = 4
+    n_layers: int = 8
     
     # Factorization for efficiency (important for real-time inference)
     factorization: str = "tucker"
@@ -59,13 +59,13 @@ class ModelConfig(ConfigBase):
 
 class OptConfig(ConfigBase):
     """Optimizer and training configuration."""
-    n_epochs: int = 1000
+    n_epochs: int = 500
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
     
     # Learning rate scheduler
     scheduler: str = "CosineAnnealingLR"
-    scheduler_T_max: int = 1000
+    scheduler_T_max: int = 500
     
     # Mixed precision for faster training
     mixed_precision: bool = False

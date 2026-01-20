@@ -41,19 +41,170 @@ class SeaSurfacePredictor:
         device:  str = 'cuda' if torch.cuda. is_available() else 'cpu',
     ):
         self.device = torch. device(device)
+        model_path = Path(model_path).expanduser().resolve()
         
         # Load model and config
-        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+        if model_path.is_dir():
+            # Handle directory-based checkpoint (e.g. from resume)
+            print(f"Loading checkpoint from directory: {model_path}")
+            
+            # Load state dict
+            state_dict_path = model_path / "model_state_dict.pt"
+            if not state_dict_path.exists():
+                raise FileNotFoundError(f"model_state_dict.pt not found in {model_path}")
+                
+            model_state_dict = torch.load(state_dict_path, map_location=self.device, weights_only=False)
+            checkpoint = {'model_state_dict': model_state_dict}
+            
+            # Try to load config if available (some versions might save it)
+            # Otherwise we rely on inference below.
+            
+            # Try to load data processor (normalizers)
+            dp_path = model_path / "data_processor.pt"
+            if dp_path.exists():
+                try:
+                    data_processor = torch.load(dp_path, map_location=self.device, weights_only=False)
+                    if hasattr(data_processor, 'in_normalizer'):
+                        checkpoint['in_normalizer'] = data_processor.in_normalizer
+                    if hasattr(data_processor, 'out_normalizer'):
+                        checkpoint['out_normalizer'] = data_processor.out_normalizer
+                except Exception as e:
+                    print(f"Warning: Failed to load data_processor.pt: {e}")
+
+        else:
+            # Handle single file checkpoint
+            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+        
+        # Determine configuration
         if 'config' in checkpoint:
             self.config = checkpoint['config']
         else:
-            print("Warning: Config not found in checkpoint. Using default configuration.")
+            print("Warning: Config not found in checkpoint. Inferring from state_dict...")
+            
+            # Get default config as a base
             config_obj = Default()
+            # Ensure we get a mutable dictionary
             self.config = config_obj.to_dict() if hasattr(config_obj, 'to_dict') else asdict(config_obj)
-        
+            
+            state_dict = checkpoint['model_state_dict']
+            
+            # --- Auto-inference Logic ---
+            
+            # 1. Infer hidden_channels
+            # Try to find a bias vector in FNO blocks to determine hidden size
+            for key, tensor in state_dict.items():
+                if "fno_blocks.convs.0.bias" in key:
+                    inferred_hidden = tensor.shape[0]
+                    self.config['model']['hidden_channels'] = inferred_hidden
+                    print(f"Inferred Hidden Channels: {inferred_hidden}")
+                    break
+            
+            # 2. Infer n_layers
+            # Find the maximum index of fno_blocks
+            max_layer_idx = 0
+            for key in state_dict.keys():
+                if "fno_blocks.convs." in key:
+                    parts = key.split('.')
+                    for part in parts:
+                        if part.isdigit():
+                            idx = int(part)
+                            if idx > max_layer_idx:
+                                max_layer_idx = idx
+            inferred_layers = max_layer_idx + 1
+            self.config['model']['n_layers'] = inferred_layers
+            print(f"Inferred Layers: {inferred_layers}")
+
+            # 3. Infer Factorization, Rank, and Modes
+            # Check for Tucker (weight.core + factors)
+            if "fno_blocks.convs.0.weight.core" in state_dict:
+                self.config['model']['factorization'] = "tucker"
+                core_shape = state_dict["fno_blocks.convs.0.weight.core"].shape
+                # core_shape: (rank_in, rank_out, rank_mode1, rank_mode2)
+                
+                # Check factors to get actual modes
+                # factors are typically: 
+                # factor_0: (hidden_in, rank_in)
+                # factor_1: (hidden_out, rank_out)
+                # factor_2: (n_modes_1, rank_mode1)
+                # factor_3: (n_modes_2_half, rank_mode2)
+                
+                inferred_modes = []
+                
+                # Try inferring Mode 1
+                if "fno_blocks.convs.0.weight.factors.factor_2" in state_dict:
+                    f2 = state_dict["fno_blocks.convs.0.weight.factors.factor_2"]
+                    inferred_modes.append(f2.shape[0])
+                
+                # Try inferring Mode 2
+                if "fno_blocks.convs.0.weight.factors.factor_3" in state_dict:
+                    f3 = state_dict["fno_blocks.convs.0.weight.factors.factor_3"]
+                    # For the last mode, FNO uses RFFT, so size is (N // 2) + 1
+                    # We need to map 33 -> 64 if possible
+                    # Heuristic: if f3.shape[0] is X, n_modes was likely (X-1)*2
+                    m2_half = f3.shape[0]
+                    m2_full = (m2_half - 1) * 2
+                    inferred_modes.append(m2_full)
+                
+                if inferred_modes:
+                    self.config['model']['n_modes'] = inferred_modes
+                
+                # Calculate rank ratio based on Hidden Channel and Rank 0
+                if 'hidden_channels' in self.config['model']:
+                        # Instead of calculating ratio, we try to pass the explicit rank list if possible.
+                        # This avoids ambiguity in how the library calculates rank from ratio.
+                        # core_shape is (r0, r1, r2, r3)
+                        # r0, r1 are channel ranks. r2, r3 are spatial mode ranks.
+                        # Recent NeuralOp versions support passing a list for rank.
+                        rank_list = list(core_shape)
+                        self.config['model']['rank'] = rank_list
+                        print(f"Inferred Tucker Rank List: {rank_list}")
+
+            # Check for Dense (weight)
+            elif "fno_blocks.convs.0.weight.factors" in state_dict: # CP might just have factors, no core? 
+                # NeuralOp CP implementation details vary, usually 'weight' is a list or tensor
+                pass # Less common in default TFNO config
+                
+            # Check for Dense (no factorization)
+            elif "fno_blocks.convs.0.weight" in state_dict:
+                self.config['model']['factorization'] = None
+                weight_shape = state_dict["fno_blocks.convs.0.weight"].shape
+                # Shape: (in, out, mode1, mode2)
+                if len(weight_shape) >= 4:
+                    inferred_modes = list(weight_shape[2:])
+                    self.config['model']['n_modes'] = inferred_modes
+                print("Inferred Factorization: None (Dense)")
+                print(f"Inferred Modes: {inferred_modes}")
+
+            # 4. Infer Skip connection type
+            # Check if 'fno_skips' exist and their type
+            if "fno_blocks.fno_skips.0.weight" in state_dict:
+                # If weights exist, it's likely linear or conv skip
+                # Default is usually 'linear' or 'soft-gating' which has weights
+                pass 
+            else:
+                # If no weights, might be 'identity'
+                # But safer to stick to default or try to infer if needed
+                pass
+
         # Reconstruct model
         from neuralop import get_model
-        self.model = get_model(self.config)
+        
+        try:
+            self.model = get_model(self.config)
+        except Exception as e:
+            print(f"Error creating model from config: {e}")
+            raise
+
+        # Load state dict
+        try:
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+        except RuntimeError as e:
+            print("\n!!! Model Loading Failed !!!")
+            print("The inferred configuration might still be slightly off.")
+            raise e
+            
+        self.model = self.model.to(self.device)
+        self.model.eval()
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.model = self.model.to(self.device)
         self.model.eval()
