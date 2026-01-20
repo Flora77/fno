@@ -17,8 +17,8 @@ class DataConfig(ConfigBase):
     folder: str = "~/neuraloperator/neuralop/data/train_data_mat"
     n_train: int = 1000
     n_test: int = 200
-    batch_size: int = 4
-    test_batch_size: int = 4
+    batch_size: int = 8
+    test_batch_size: int = 8
     input_steps: int = 40  # 10s of history at 0.25s
     output_steps:  int = 240  # 60s prediction at 0.25s
     observation_size: List[int] = [640, 640]
@@ -59,7 +59,7 @@ class ModelConfig(ConfigBase):
 
 class OptConfig(ConfigBase):
     """Optimizer and training configuration."""
-    n_epochs: int = 500
+    n_epochs: int = 1000
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
     

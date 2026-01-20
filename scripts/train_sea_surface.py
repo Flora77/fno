@@ -245,10 +245,16 @@ if is_logger:
         torch.save(save_dict, model_save_path)
     except Exception as e:
         print(f"Warning: Failed to save config with model: {e}")
-        # Fallback: save only model state
-        torch.save({
+        # Fallback: save model state AND normalizers
+        save_dict = {
             'model_state_dict': model.state_dict(),
-        }, model_save_path)
+        }
+        if hasattr(data_processor, 'in_normalizer'):
+            save_dict['in_normalizer'] = data_processor.in_normalizer
+        if hasattr(data_processor, 'out_normalizer'):
+            save_dict['out_normalizer'] = data_processor.out_normalizer
+            
+        torch.save(save_dict, model_save_path)
 
     print(f"\nModel saved to {model_save_path}")
 
