@@ -66,7 +66,7 @@ class SeaSurfacePredictor:
             self.in_normalizer = None
             self.out_normalizer = None
             if (model_path / "data_processor.pt").exists():
-                dp_state = torch.load(model_path / "data_processor.pt", map_location=self.device)
+                dp_state = torch.load(model_path / "data_processor.pt", map_location=self.device, weights_only=False)
                 self.in_normalizer = dp_state.get('in_normalizer')
                 self.out_normalizer = dp_state.get('out_normalizer')
                 print("Loaded normalizers from data_processor.pt")

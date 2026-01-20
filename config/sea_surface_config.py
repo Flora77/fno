@@ -17,8 +17,8 @@ class DataConfig(ConfigBase):
     folder: str = "~/neuraloperator/neuralop/data/train_data_mat"
     n_train: int = 1000
     n_test: int = 200
-    batch_size: int = 8
-    test_batch_size: int = 8
+    batch_size: int = 4
+    test_batch_size: int = 4
     input_steps: int = 40  # 10s of history at 0.25s
     output_steps:  int = 240  # 60s prediction at 0.25s
     observation_size: List[int] = [640, 640]
@@ -39,7 +39,7 @@ class ModelConfig(ConfigBase):
     out_channels: int = 240  # output_steps
     
     # FNO architecture parameters
-    n_modes: List[int] = [32, 32]  # Fourier modes
+    n_modes: List[int] = [64, 64]  # Fourier modes
     hidden_channels: int = 128
     n_layers: int = 4
     

@@ -27,10 +27,16 @@ def load_mat_data(file_path, variable='h'):
     return None
 
 def check_error():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, default="checkpoints/sea_surface_fno.pt", help="Path to model checkpoint")
+    parser.add_argument('--data', type=str, default="neuralop/data/train_data_mat/PM_Tp7d5_Hs1_length640_x128_T140_to_300.mat", help="Path to test data")
+    args = parser.parse_args()
+
     # Config
-    model_path = "checkpoints/sea_surface_fno.pt"
+    model_path = args.model
     # 使用之前确认存在的文件
-    data_path = "neuralop/data/train_data_mat/PM_Tp7d5_Hs1_length640_x128_T140_to_300.mat" 
+    data_path = args.data 
     
     print(f"Loading model from {model_path}...")
     try:
