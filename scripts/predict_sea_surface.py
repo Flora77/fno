@@ -41,26 +41,66 @@ class SeaSurfacePredictor:
         device:  str = 'cuda' if torch.cuda. is_available() else 'cpu',
     ):
         self.device = torch. device(device)
+        model_path = Path(model_path)
         
-        # Load model and config
-        checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
-        if 'config' in checkpoint:
-            self.config = checkpoint['config']
-        else:
-            print("Warning: Config not found in checkpoint. Using default configuration.")
+        # Check if model_path is a directory (Resume style checkpoint)
+        if model_path.is_dir():
+            print(f"Loading checkpoint from directory: {model_path}")
+            # Try to find model file
+            if (model_path / "best_model_state_dict.pt").exists():
+                model_file = model_path / "best_model_state_dict.pt"
+            elif (model_path / "model_state_dict.pt").exists():
+                model_file = model_path / "model_state_dict.pt"
+            else:
+                raise FileNotFoundError(f"No model state dict found in {model_path}")
+            
+            # Load weights
+            state_dict = torch.load(model_file, map_location=self.device, weights_only=False)
+            
+            # Load config (Not usually in resume dir, use default)
+            print("Using default configuration for resume checkpoint.")
             config_obj = Default()
             self.config = config_obj.to_dict() if hasattr(config_obj, 'to_dict') else asdict(config_obj)
+            
+            # Load normalizers if available
+            self.in_normalizer = None
+            self.out_normalizer = None
+            if (model_path / "data_processor.pt").exists():
+                dp_state = torch.load(model_path / "data_processor.pt", map_location=self.device)
+                self.in_normalizer = dp_state.get('in_normalizer')
+                self.out_normalizer = dp_state.get('out_normalizer')
+                print("Loaded normalizers from data_processor.pt")
+            else:
+                print("Warning: data_processor.pt not found. Normalization might be missing!")
+                
+        else:
+            # Single file checkpoint (Legacy or Final style)
+            print(f"Loading checkpoint from file: {model_path}")
+            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+            
+            if 'config' in checkpoint:
+                self.config = checkpoint['config']
+            else:
+                print("Warning: Config not found in checkpoint. Using default configuration.")
+                config_obj = Default()
+                self.config = config_obj.to_dict() if hasattr(config_obj, 'to_dict') else asdict(config_obj)
+            
+            # Helper to get state dict
+            if 'model_state_dict' in checkpoint:
+                state_dict = checkpoint['model_state_dict']
+            else:
+                state_dict = checkpoint # Assume raw state dict if key missing
+            
+            # Load normalization parameters if available
+            self.in_normalizer = checkpoint.get('in_normalizer', None)
+            self.out_normalizer = checkpoint.get('out_normalizer', None)
         
         # Reconstruct model
         from neuralop import get_model
         self.model = get_model(self.config)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model.load_state_dict(state_dict)
         self.model = self.model.to(self.device)
         self.model.eval()
-        
-        # Load normalization parameters if available
-        self.in_normalizer = checkpoint.get('in_normalizer', None)
-        self.out_normalizer = checkpoint.get('out_normalizer', None)
         
         # Extract config parameters
         self. input_steps = self. config['data']['input_steps']
@@ -292,7 +332,7 @@ def main():
     import argparse
     
     parser = argparse. ArgumentParser(description='Sea Surface Prediction')
-    parser.add_argument('--model', type=str, required=True,
+    parser.add_argument('--model', type=str, default=None, required=False,
                         help='Path to trained model checkpoint')
     parser.add_argument('--input', type=str, required=True,
                         help='Path to input .mat file')
@@ -307,8 +347,38 @@ def main():
     
     args = parser. parse_args()
     
+    model_path = args.model
+    
+    # Auto-detect latest checkpoint if not provided
+    if model_path is None:
+        print("No model specified. Searching for latest checkpoint...")
+        base_dir = Path(__file__).resolve().parent.parent
+        resume_dir = base_dir / "checkpoints/sea_surface_resume"
+        final_model = base_dir / "checkpoints/sea_surface_fno.pt"
+        
+        candidates = []
+        
+        # Check Final Model
+        if final_model.exists():
+            candidates.append(final_model)
+            
+        # Check Resume Epochs
+        if resume_dir.exists():
+            for p in resume_dir.glob("epoch_*"):
+                if p.is_dir() and (p / "model_state_dict.pt").exists():
+                    candidates.append(p)
+        
+        if not candidates:
+            print(f"Error: No checkpoints found in {resume_dir} or {final_model}")
+            sys.exit(1)
+            
+        # Sort by modification time
+        latest_model = sorted(candidates, key=lambda p: p.stat().st_mtime)[-1]
+        model_path = str(latest_model)
+        print(f"Selected latest checkpoint: {model_path}")
+
     # Initialize predictor
-    predictor = SeaSurfacePredictor(args.model)
+    predictor = SeaSurfacePredictor(model_path)
     
     # Run benchmark if requested
     if args.benchmark:

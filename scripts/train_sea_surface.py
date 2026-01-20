@@ -208,6 +208,27 @@ print("\n" + "=" * 60)
 print("STARTING TRAINING")
 print("=" * 60 + "\n")
 
+# Checkpoint directory for resuming training
+checkpoint_dir = Path("checkpoints/sea_surface_resume")
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+# Check if we can resume
+resume_from = None
+# Sort by modification time to find the latest
+checkpoints = sorted(checkpoint_dir.glob("epoch_*.pt"), key=lambda p: p.stat().st_mtime)
+
+if checkpoints:
+    resume_from = checkpoint_dir
+    print(f"Found {len(checkpoints)} checkpoints. Resuming from latest: {checkpoints[-1].name}")
+elif (checkpoint_dir / "model_state_dict.pt").exists() or (checkpoint_dir / "best_model_state_dict.pt").exists():
+    resume_from = checkpoint_dir
+    print(f"Found standard checkpoints. Resuming from {resume_from}")
+else:
+    print(f"No existing checkpoints found at {checkpoint_dir}. Starting from scratch.")
+
+# Determine save interval (default to 50 if not in config)
+save_every = getattr(config.opt, 'save_interval', 50)
+
 trainer.train(
     train_loader,
     test_loaders,
@@ -216,6 +237,9 @@ trainer.train(
     regularizer=False,
     training_loss=train_loss,
     eval_losses=eval_losses,
+    save_every=save_every, 
+    save_dir=checkpoint_dir,
+    resume_from_dir=resume_from,
 )
 
 # Save the trained model

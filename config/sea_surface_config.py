@@ -65,7 +65,7 @@ class OptConfig(ConfigBase):
     
     # Learning rate scheduler
     scheduler: str = "CosineAnnealingLR"
-    scheduler_T_max: int = 500
+    scheduler_T_max: int = 1000
     
     # Mixed precision for faster training
     mixed_precision: bool = False
@@ -74,10 +74,10 @@ class OptConfig(ConfigBase):
     training_loss:  str = "h1"  # H1 loss for smoother predictions
     
     # Evaluation interval
-    eval_interval: int = 10
+    eval_interval: int = 10     # Evaluate every 10 epochs
     
-    # Gradient clipping
-    clip_grad_norm:  float = 1.0
+    # Checkpoint interval
+    save_interval: int = 50     # Save checkpoint every 50 epochs
 
 
 class DistributedConfig(ConfigBase):

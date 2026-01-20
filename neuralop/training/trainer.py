@@ -259,7 +259,7 @@ class Trainer:
             # save checkpoint if save_every and save_best is not set
             if self.save_every is not None:
                 if epoch % self.save_every == 0:
-                    self.checkpoint(save_dir)
+                    self.checkpoint(save_dir, epoch=epoch)
 
         return epoch_metrics
 
@@ -793,7 +793,7 @@ class Trainer:
                 if self.verbose:
                     print(f"Trainer resuming from epoch {resume_epoch}")
 
-    def checkpoint(self, save_dir):
+    def checkpoint(self, save_dir, epoch=None):
         """checkpoint saves current training state
         to a directory for resuming later. Only saves
         training state on the first GPU.
@@ -803,12 +803,23 @@ class Trainer:
         ----------
         save_dir : str | Path
             directory in which to save training state
+        epoch : int, optional
+            current epoch number. If provided, saves to a subdirectory 'epoch_<epoch>'
         """
         if comm.get_local_rank() == 0:
+            if isinstance(save_dir, str):
+                save_dir = Path(save_dir)
+                
             if self.save_best is not None:
                 save_name = "best_model"
             else:
                 save_name = "model"
+            
+            # If epoch provided (periodic checkpoint), save to subfolder
+            if epoch is not None:
+                save_dir = save_dir / f"epoch_{epoch}"
+                save_dir.mkdir(parents=True, exist_ok=True)
+                
             save_training_state(
                 save_dir=save_dir,
                 save_name=save_name,
@@ -818,5 +829,17 @@ class Trainer:
                 regularizer=self.regularizer,
                 epoch=self.epoch,
             )
+            
+            # Save data_processor (normalizers) if available
+            if self.data_processor is not None:
+                dp_state = {}
+                if hasattr(self.data_processor, 'in_normalizer'):
+                    dp_state['in_normalizer'] = self.data_processor.in_normalizer
+                if hasattr(self.data_processor, 'out_normalizer'):
+                    dp_state['out_normalizer'] = self.data_processor.out_normalizer
+                
+                if dp_state:
+                    torch.save(dp_state, save_dir / "data_processor.pt")
+            
             if self.verbose:
                 print(f"[Rank 0]: saved training state to {save_dir}")
