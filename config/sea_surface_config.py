@@ -15,8 +15,10 @@ from zencfg import ConfigBase
 class DataConfig(ConfigBase):
     """Data configuration for sea surface prediction."""
     folder: str = "~/neuraloperator/neuralop/data/train_data_mat"
-    n_train: int = 500
-    n_test: int = 200
+    # Set n_train large enough to include all data from multiple files.
+    # The loader will cap this at 80% of total available samples.
+    n_train: int = 20000 
+    n_test: int = 5000
     batch_size: int = 4
     test_batch_size: int = 4
     input_steps: int = 40  # 10s of history at 0.25s
@@ -59,13 +61,13 @@ class ModelConfig(ConfigBase):
 
 class OptConfig(ConfigBase):
     """Optimizer and training configuration."""
-    n_epochs: int = 500
+    n_epochs: int = 600
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
     
     # Learning rate scheduler
     scheduler: str = "CosineAnnealingLR"
-    scheduler_T_max: int = 500
+    scheduler_T_max: int = 600
     
     # Mixed precision for faster training
     mixed_precision: bool = False

@@ -53,7 +53,8 @@ class SeaSurfacePredictor:
             if not state_dict_path.exists():
                 raise FileNotFoundError(f"model_state_dict.pt not found in {model_path}")
                 
-            model_state_dict = torch.load(state_dict_path, map_location=self.device, weights_only=False)
+            # Load to CPU first to save GPU memory
+            model_state_dict = torch.load(state_dict_path, map_location='cpu', weights_only=False)
             checkpoint = {'model_state_dict': model_state_dict}
             
             # Try to load config if available (some versions might save it)
@@ -63,17 +64,26 @@ class SeaSurfacePredictor:
             dp_path = model_path / "data_processor.pt"
             if dp_path.exists():
                 try:
-                    data_processor = torch.load(dp_path, map_location=self.device, weights_only=False)
-                    if hasattr(data_processor, 'in_normalizer'):
-                        checkpoint['in_normalizer'] = data_processor.in_normalizer
-                    if hasattr(data_processor, 'out_normalizer'):
-                        checkpoint['out_normalizer'] = data_processor.out_normalizer
+                    data_processor = torch.load(dp_path, map_location='cpu', weights_only=False)
+                    
+                    # Handle both Dict (saved by Trainer) and Object (saved manually) formats
+                    if isinstance(data_processor, dict):
+                         if 'in_normalizer' in data_processor:
+                             checkpoint['in_normalizer'] = data_processor['in_normalizer']
+                         if 'out_normalizer' in data_processor:
+                             checkpoint['out_normalizer'] = data_processor['out_normalizer']
+                    else:
+                        if hasattr(data_processor, 'in_normalizer'):
+                            checkpoint['in_normalizer'] = data_processor.in_normalizer
+                        if hasattr(data_processor, 'out_normalizer'):
+                            checkpoint['out_normalizer'] = data_processor.out_normalizer
                 except Exception as e:
                     print(f"Warning: Failed to load data_processor.pt: {e}")
 
         else:
             # Handle single file checkpoint
-            checkpoint = torch.load(model_path, map_location=self.device, weights_only=False)
+            # Load to CPU first to save GPU memory
+            checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
         
         # Determine configuration
         if 'config' in checkpoint:
@@ -213,6 +223,17 @@ class SeaSurfacePredictor:
         self.in_normalizer = checkpoint.get('in_normalizer', None)
         self.out_normalizer = checkpoint.get('out_normalizer', None)
         
+        # DEBUG: Print Normalizer States
+        if self.in_normalizer:
+            print(f"Input Normalizer Loaded: Mean={self.in_normalizer.mean.mean().item():.4f}, Std={self.in_normalizer.std.mean().item():.4f}")
+        else:
+            print("WARNING: No Input Normalizer loaded! Model expects normalized data but will receive raw data.")
+            
+        if self.out_normalizer:
+            print(f"Output Normalizer Loaded: Mean={self.out_normalizer.mean.mean().item():.4f}, Std={self.out_normalizer.std.mean().item():.4f}")
+        else:
+            print("WARNING: No Output Normalizer loaded!")
+
         # Extract config parameters
         self. input_steps = self. config['data']['input_steps']
         self.output_steps = self. config['data']['output_steps']
@@ -271,13 +292,15 @@ class SeaSurfacePredictor:
             x = self.in_normalizer.transform(x)
         
         # Run inference
-        torch.cuda.synchronize() if torch.cuda.is_available() else None
+        if self.device.type == 'cuda':
+            torch.cuda.synchronize()
         start_time = time.time()
         
         with torch.no_grad():
             y_pred = self.model(x)
         
-        torch.cuda.synchronize() if torch.cuda.is_available() else None
+        if self.device.type == 'cuda':
+            torch.cuda.synchronize()
         inference_time = time.time() - start_time
         
         # Denormalize output

@@ -1,0 +1,93 @@
+WandB login failed: [Errno 2] No such file or directory: '../config/wandb_api_key.txt'. Disabling WandB logging.
+============================================================
+SEA SURFACE ELEVATION PREDICTION - FNO TRAINING
+============================================================
+
+### CONFIGURATION ###
+Observation area: 640m x 640m
+Prediction area:  640m x 640m
+Grid size:  128 x 128
+Time step: 0.25s
+Input history: 10.0s (40 steps)
+Prediction horizon: 60.0s (240 steps)
+
+Model: tfno
+Fourier modes: [64, 64]
+Hidden channels: 128
+Layers: 8
+============================================================
+DEBUG: Loaded file PM_Tp4_Hs1_fmin012_fmax075_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+DEBUG: Loaded file PM_Tp5_Hs2_fmin010_fmax060_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+DEBUG: Loaded file PM_Tp7_Hs2d5_fmin007_fmax043_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+
+### MODEL ###
+TFNO(
+  (positional_embedding): GridEmbeddingND()
+  (domain_padding): DomainPadding()
+  (fno_blocks): FNOBlocks(
+    (convs): ModuleList(
+      (0-7): 8 x SpectralConv(
+        (weight): TuckerTensor(shape=(128, 128, 64, 33), rank=(103, 103, 51, 27))
+      )
+    )
+    (fno_skips): ModuleList(
+      (0-7): 8 x SoftGating()
+    )
+    (channel_mlp): ModuleList(
+      (0-7): 8 x ChannelMLP(
+        (fcs): ModuleList(
+          (0): Conv1d(128, 64, kernel_size=(1,), stride=(1,))
+          (1): Conv1d(64, 128, kernel_size=(1,), stride=(1,))
+        )
+      )
+    )
+    (channel_mlp_skips): ModuleList(
+      (0-7): 8 x SoftGating()
+    )
+    (norm): ModuleList(
+      (0-15): 16 x InstanceNorm()
+    )
+  )
+  (lifting): ChannelMLP(
+    (fcs): ModuleList(
+      (0): Conv1d(42, 256, kernel_size=(1,), stride=(1,))
+      (1): Conv1d(256, 128, kernel_size=(1,), stride=(1,))
+    )
+  )
+  (projection): ChannelMLP(
+    (fcs): ModuleList(
+      (0): Conv1d(128, 256, kernel_size=(1,), stride=(1,))
+      (1): Conv1d(256, 240, kernel_size=(1,), stride=(1,))
+    )
+  )
+)
+
+### OPTIMIZER:  AdamW ###
+Learning rate: 0.001
+Weight decay: 0.0001
+
+### SCHEDULER: CosineAnnealingLR ###
+
+### LOSS FUNCTIONS ###
+Training:  h1
+Evaluation: ['h1', 'l2']
+
+### MODEL PARAMETERS:   234,500,144 ###
+
+============================================================
+STARTING TRAINING
+============================================================
+
+No existing checkpoints found at checkpoints/sea_surface_resume. Starting from scratch.
+Training on 868 samples
+Testing on [218] samples         on resolutions ['sea_surface'].
+Raw outputs of shape torch.Size([4, 240, 128, 128])
+[0] time=58.93, avg_loss=150.9633, train_err=603.8532
+Eval: sea_surface_h1=111.9432, sea_surface_l2=126.8747
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_0
+[10] time=57.53, avg_loss=48.7359, train_err=194.9434
+Eval: sea_surface_h1=46.8282, sea_surface_l2=57.4757
+[20] time=57.46, avg_loss=37.6886, train_err=150.7544
+Eval: sea_surface_h1=38.0940, sea_surface_l2=49.5038
+[30] time=57.54, avg_loss=31.3474, train_err=125.3898
+Eval: sea_surface_h1=30.7450, sea_surface_l2=42.8352

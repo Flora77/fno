@@ -30,22 +30,38 @@ def check_error():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default="checkpoints/sea_surface_fno.pt", help="Path to model checkpoint")
-    parser.add_argument('--data', type=str, default="neuralop/data/train_data_mat/PM_Tp7d5_Hs1_length640_x128_T140_to_300.mat", help="Path to test data")
+    parser.add_argument('--data', type=str, default="/home/chenping/neuraloperator/neuralop/data/test_data_mat/PM_Tp7d5_Hs1_length640_x128_T140_to_300.mat", help="Path to test data")
+    parser.add_argument('--device', type=str, default="cpu", help="Device to run verification on (cpu or cuda)")
     args = parser.parse_args()
 
     # Config
     model_path = args.model
     # 使用之前确认存在的文件
     data_path = args.data 
+    device = args.device
     
-    print(f"Loading model from {model_path}...")
+    print(f"Loading model from {model_path} on {device}...")
     try:
         # Init Predictor
-        predictor = SeaSurfacePredictor(model_path)
+        predictor = SeaSurfacePredictor(model_path, device=device)
     except Exception as e:
         print(f"Error loading model: {e}")
         return
 
+    # Try to locate data files automatically if default path doesn't exist
+    possible_paths = [
+        data_path,
+        "neuralop/data/train_data_mat/PM_Tp5_Hs2_fmin010_fmax060_128x128x5_T140_to_300.mat",
+        "/root/neuraloperator/neuralop/data/train_data_mat/PM_Tp5_Hs2_fmin010_fmax060_128x128x5_T140_to_300.mat"
+    ]
+    
+    found_data = False
+    for p in possible_paths:
+        if Path(p).exists():
+            data_path = p
+            found_data = True
+            break
+            
     print(f"Loading data from {data_path}...")
     # Load Data
     full_data = load_mat_data(data_path) 
@@ -93,7 +109,13 @@ def check_error():
     print(f"Evaluating on sample starting at index {start_idx}")
     print(f"Prediction Horizon: {t_output * 0.25}s")
     print(f"Inference Time: {time_taken*1000:.2f} ms")
-    print(f"Relative L2 Error: {rel_l2:.4f} ({rel_l2*100:.2f}%)")
+    
+    # DEBUG: 只打印统计信息
+    print(f"\n[Statistics Check]")
+    print(f"Target Data : Mean={np.mean(target_data):.4f}, Std={np.std(target_data):.4f}, Min={np.min(target_data):.4f}, Max={np.max(target_data):.4f}")
+    print(f"Prediction  : Mean={np.mean(pred):.4f}, Std={np.std(pred):.4f}, Min={np.min(pred):.4f}, Max={np.max(pred):.4f}")
+    
+    print(f"\nRelative L2 Error: {rel_l2:.4f} ({rel_l2*100:.2f}%)")
     print("-" * 30)
     
     if rel_l2 < 0.10:

@@ -1,0 +1,209 @@
+WandB login failed: [Errno 2] No such file or directory: '../config/wandb_api_key.txt'. Disabling WandB logging.
+============================================================
+SEA SURFACE ELEVATION PREDICTION - FNO TRAINING
+============================================================
+
+### CONFIGURATION ###
+Observation area: 640m x 640m
+Prediction area:  640m x 640m
+Grid size:  128 x 128
+Time step: 0.25s
+Input history: 10.0s (40 steps)
+Prediction horizon: 60.0s (240 steps)
+
+Model: tfno
+Fourier modes: [64, 64]
+Hidden channels: 128
+Layers: 8
+============================================================
+DEBUG: Loaded file PM_Tp4_Hs1_fmin012_fmax075_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+DEBUG: Loaded file PM_Tp5_Hs2_fmin010_fmax060_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+DEBUG: Loaded file PM_Tp7_Hs2d5_fmin007_fmax043_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+DEBUG: Loaded file PM_Tp8_Hs3_fmin006_fmax038_128x128x5_T140_to_300.mat, shape=(641, 128, 128), size=0.04 GB
+
+### MODEL ###
+TFNO(
+  (positional_embedding): GridEmbeddingND()
+  (domain_padding): DomainPadding()
+  (fno_blocks): FNOBlocks(
+    (convs): ModuleList(
+      (0-7): 8 x SpectralConv(
+        (weight): TuckerTensor(shape=(128, 128, 64, 33), rank=(103, 103, 51, 27))
+      )
+    )
+    (fno_skips): ModuleList(
+      (0-7): 8 x SoftGating()
+    )
+    (channel_mlp): ModuleList(
+      (0-7): 8 x ChannelMLP(
+        (fcs): ModuleList(
+          (0): Conv1d(128, 64, kernel_size=(1,), stride=(1,))
+          (1): Conv1d(64, 128, kernel_size=(1,), stride=(1,))
+        )
+      )
+    )
+    (channel_mlp_skips): ModuleList(
+      (0-7): 8 x SoftGating()
+    )
+    (norm): ModuleList(
+      (0-15): 16 x InstanceNorm()
+    )
+  )
+  (lifting): ChannelMLP(
+    (fcs): ModuleList(
+      (0): Conv1d(42, 256, kernel_size=(1,), stride=(1,))
+      (1): Conv1d(256, 128, kernel_size=(1,), stride=(1,))
+    )
+  )
+  (projection): ChannelMLP(
+    (fcs): ModuleList(
+      (0): Conv1d(128, 256, kernel_size=(1,), stride=(1,))
+      (1): Conv1d(256, 240, kernel_size=(1,), stride=(1,))
+    )
+  )
+)
+
+### OPTIMIZER:  AdamW ###
+Learning rate: 0.001
+Weight decay: 0.0001
+
+### SCHEDULER: CosineAnnealingLR ###
+
+### LOSS FUNCTIONS ###
+Training:  h1
+Evaluation: ['h1', 'l2']
+
+### MODEL PARAMETERS:   234,500,144 ###
+
+============================================================
+STARTING TRAINING
+============================================================
+
+No existing checkpoints found at checkpoints/sea_surface_resume. Starting from scratch.
+Training on 1158 samples
+Testing on [290] samples         on resolutions ['sea_surface'].
+Raw outputs of shape torch.Size([4, 240, 128, 128])
+[0] time=77.78, avg_loss=149.6637, train_err=597.6227
+Eval: sea_surface_h1=112.4711, sea_surface_l2=124.5091
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_0
+[10] time=76.70, avg_loss=46.3135, train_err=184.9347
+Eval: sea_surface_h1=45.2892, sea_surface_l2=56.1860
+[20] time=76.79, avg_loss=37.2820, train_err=148.8708
+Eval: sea_surface_h1=37.3984, sea_surface_l2=49.3366
+[30] time=76.80, avg_loss=32.5291, train_err=129.8920
+Eval: sea_surface_h1=33.4569, sea_surface_l2=45.4563
+[40] time=76.69, avg_loss=29.1871, train_err=116.5471
+Eval: sea_surface_h1=31.4875, sea_surface_l2=43.1597
+[50] time=76.69, avg_loss=29.1774, train_err=116.5086
+Eval: sea_surface_h1=29.9488, sea_surface_l2=41.6338
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_50
+[60] time=76.83, avg_loss=25.6609, train_err=102.4667
+Eval: sea_surface_h1=26.6219, sea_surface_l2=38.3891
+[70] time=76.76, avg_loss=24.9544, train_err=99.6456
+Eval: sea_surface_h1=25.1719, sea_surface_l2=36.8250
+[80] time=76.69, avg_loss=23.4683, train_err=93.7113
+Eval: sea_surface_h1=23.6107, sea_surface_l2=35.2720
+[90] time=76.75, avg_loss=22.8809, train_err=91.3658
+Eval: sea_surface_h1=25.1455, sea_surface_l2=35.8015
+[100] time=76.72, avg_loss=22.3827, train_err=89.3764
+Eval: sea_surface_h1=22.5084, sea_surface_l2=33.7702
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_100
+[110] time=76.68, avg_loss=21.1574, train_err=84.4838
+Eval: sea_surface_h1=21.7149, sea_surface_l2=32.8530
+[120] time=76.81, avg_loss=20.7592, train_err=82.8935
+Eval: sea_surface_h1=21.5992, sea_surface_l2=32.5231
+[130] time=76.71, avg_loss=20.3401, train_err=81.2202
+Eval: sea_surface_h1=23.0811, sea_surface_l2=33.6161
+[140] time=76.69, avg_loss=19.7258, train_err=78.7672
+Eval: sea_surface_h1=20.7331, sea_surface_l2=30.9945
+[150] time=76.71, avg_loss=19.0374, train_err=76.0182
+Eval: sea_surface_h1=20.3599, sea_surface_l2=30.8364
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_150
+[160] time=76.73, avg_loss=18.7803, train_err=74.9915
+Eval: sea_surface_h1=21.9489, sea_surface_l2=31.5467
+[170] time=76.72, avg_loss=18.7395, train_err=74.8287
+Eval: sea_surface_h1=19.3619, sea_surface_l2=29.4258
+[180] time=76.74, avg_loss=17.7525, train_err=70.8875
+Eval: sea_surface_h1=18.7912, sea_surface_l2=28.7356
+[190] time=76.68, avg_loss=17.7738, train_err=70.9728
+Eval: sea_surface_h1=18.4109, sea_surface_l2=28.2108
+[200] time=76.75, avg_loss=16.8807, train_err=67.4063
+Eval: sea_surface_h1=17.9221, sea_surface_l2=27.6702
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_200
+[210] time=76.73, avg_loss=16.7773, train_err=66.9935
+Eval: sea_surface_h1=17.3178, sea_surface_l2=26.9720
+[220] time=76.74, avg_loss=16.3652, train_err=65.3478
+Eval: sea_surface_h1=16.9386, sea_surface_l2=26.5189
+[230] time=76.80, avg_loss=16.0596, train_err=64.1275
+Eval: sea_surface_h1=16.8196, sea_surface_l2=26.1626
+[240] time=76.80, avg_loss=15.6113, train_err=62.3377
+Eval: sea_surface_h1=17.1868, sea_surface_l2=26.3137
+[250] time=76.68, avg_loss=15.4851, train_err=61.8337
+Eval: sea_surface_h1=16.4964, sea_surface_l2=25.7190
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_250
+[260] time=76.77, avg_loss=14.8210, train_err=59.1820
+Eval: sea_surface_h1=16.0365, sea_surface_l2=25.1903
+[270] time=76.76, avg_loss=14.6733, train_err=58.5918
+Eval: sea_surface_h1=16.0117, sea_surface_l2=24.9628
+[280] time=76.74, avg_loss=14.8911, train_err=59.4618
+Eval: sea_surface_h1=16.0190, sea_surface_l2=24.8020
+[290] time=76.76, avg_loss=14.4901, train_err=57.8606
+Eval: sea_surface_h1=15.4471, sea_surface_l2=24.3892
+[300] time=76.71, avg_loss=14.1690, train_err=56.5783
+Eval: sea_surface_h1=15.1088, sea_surface_l2=23.8457
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_300
+[310] time=76.72, avg_loss=13.9103, train_err=55.5453
+Eval: sea_surface_h1=14.9002, sea_surface_l2=23.5853
+[320] time=76.76, avg_loss=13.9100, train_err=55.5441
+Eval: sea_surface_h1=15.2501, sea_surface_l2=23.7780
+[330] time=76.69, avg_loss=13.4700, train_err=53.7870
+Eval: sea_surface_h1=14.6351, sea_surface_l2=23.3235
+[340] time=76.76, avg_loss=13.4540, train_err=53.7231
+Eval: sea_surface_h1=14.5872, sea_surface_l2=23.1142
+[350] time=76.72, avg_loss=13.2197, train_err=52.7876
+Eval: sea_surface_h1=14.3855, sea_surface_l2=22.8551
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_350
+[360] time=76.67, avg_loss=13.2039, train_err=52.7245
+Eval: sea_surface_h1=14.1923, sea_surface_l2=22.6656
+[370] time=76.73, avg_loss=12.9620, train_err=51.7587
+Eval: sea_surface_h1=14.0746, sea_surface_l2=22.5169
+[380] time=76.68, avg_loss=12.8820, train_err=51.4393
+Eval: sea_surface_h1=14.0219, sea_surface_l2=22.4254
+[390] time=76.72, avg_loss=12.8004, train_err=51.1134
+Eval: sea_surface_h1=13.9152, sea_surface_l2=22.3924
+[400] time=76.71, avg_loss=12.7281, train_err=50.8246
+Eval: sea_surface_h1=13.8519, sea_surface_l2=22.2147
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_400
+[410] time=76.74, avg_loss=12.6532, train_err=50.5257
+Eval: sea_surface_h1=13.7738, sea_surface_l2=22.1178
+[420] time=76.76, avg_loss=12.5923, train_err=50.2825
+Eval: sea_surface_h1=13.7182, sea_surface_l2=22.0394
+[430] time=76.70, avg_loss=12.5423, train_err=50.0829
+Eval: sea_surface_h1=13.6765, sea_surface_l2=21.9866
+[440] time=76.70, avg_loss=12.5002, train_err=49.9146
+Eval: sea_surface_h1=13.6396, sea_surface_l2=21.9690
+[450] time=76.77, avg_loss=12.4669, train_err=49.7817
+Eval: sea_surface_h1=13.6122, sea_surface_l2=21.9707
+[Rank 0]: saved training state to checkpoints/sea_surface_resume/epoch_450
+[460] time=76.70, avg_loss=12.4418, train_err=49.6814
+Eval: sea_surface_h1=13.5914, sea_surface_l2=21.9137
+[470] time=76.76, avg_loss=12.4237, train_err=49.6092
+Eval: sea_surface_h1=13.5794, sea_surface_l2=21.8729
+[480] time=76.68, avg_loss=12.4116, train_err=49.5610
+Eval: sea_surface_h1=13.5734, sea_surface_l2=21.8596
+[490] time=76.72, avg_loss=12.4050, train_err=49.5345
+Eval: sea_surface_h1=13.5709, sea_surface_l2=21.8594
+Warning: Failed to save config with model: 'to_dict'
+
+Model saved to checkpoints/sea_surface_fno.pt
+
+============================================================
+INFERENCE BENCHMARK
+============================================================
+Average inference time: 34.07 ms
+Inference time for 60s prediction: 34.07 ms
+✓ Meets real-time requirement (<10s)
+
+============================================================
+TRAINING COMPLETE
+============================================================

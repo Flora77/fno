@@ -73,7 +73,6 @@ class SeaSurfaceDataset(Dataset):
         self.transform = transform
         
         # Calculate prediction region indices (center 500m of 1500m)
-        # For 128 grid points over 1500m, 500m corresponds to ~43 points
         obs_resolution = observation_size[0] / grid_size  # meters per grid point
         pred_grid_size = int(prediction_size[0] / obs_resolution)
         
@@ -81,85 +80,85 @@ class SeaSurfaceDataset(Dataset):
         self.pred_start = (grid_size - pred_grid_size) // 2
         self.pred_end = self.pred_start + pred_grid_size
         
-        # Load all data
-        self. samples = []
-        self._load_data()
+        # Metadata storage for lazy loading: (file_idx, start_time_idx)
+        self.sample_metadata = []
+        # Cache for loaded full arrays to avoid repeated I/O but share memory
+        self.data_cache = []
         
-    def _load_data(self):
-        """Load and preprocess all . mat files."""
-        for file_path in self.data_files:
+        self._load_metadata()
+        
+    def _load_metadata(self):
+        """
+        Load logical structure of data processing without duplicating tensors.
+        Stores raw full-sequence data in self.data_cache and indices in self.sample_metadata.
+        """
+        for file_idx, file_path in enumerate(self.data_files):
             try:
+                # Load the full file only once
                 data = sio.loadmat(str(file_path))
                 
-                # Assuming . mat file contains 'h' variable with shape (T, X, Y)
-                # Adjust key name based on actual data structure
-                if 'h' in data: 
-                    h = data['h']
-                elif 'eta' in data: 
-                    h = data['eta']
-                elif 'elevation' in data: 
-                    h = data['elevation']
+                # Find variable
+                if 'h' in data: h = data['h']
+                elif 'eta' in data: h = data['eta']
+                elif 'elevation' in data: h = data['elevation']
                 else:
-                    # Try to find the main data array
                     keys = [k for k in data.keys() if not k.startswith('__')]
-                    if len(keys) == 1:
-                        h = data[keys[0]]
-                    else:
-                        raise ValueError(f"Cannot identify data variable in {file_path}")
+                    if len(keys) == 1: h = data[keys[0]]
+                    else: raise ValueError(f"Cannot identify data variable in {file_path}")
+            
             except NotImplementedError:
-                # Fallback for MATLAB v7.3 files which use HDF5 format
+                # HDF5 Fallback
                 with h5py.File(file_path, 'r') as f:
-                    if 'h' in f:
-                        h = f['h'][()]
-                    elif 'eta' in f:
-                        h = f['eta'][()]
-                    elif 'elevation' in f:
-                        h = f['elevation'][()]
+                    if 'h' in f: h = f['h'][()]
+                    elif 'eta' in f: h = f['eta'][()]
+                    elif 'elevation' in f: h = f['elevation'][()]
                     else:
                         keys = [k for k in f.keys() if k != '#refs#']
-                        if len(keys) >= 1:
-                            h = f[keys[0]][()]
-                        else:
-                            raise ValueError(f"Cannot identify data variable in {file_path} (HDF5)")
-                    
-                    # MATLAB v7.3 saves arrays in column-major order, h5py reads as row-major.
-                    # This results in transposed dimensions compared to loadmat.
+                        if len(keys) >= 1: h = f[keys[0]][()]
+                        else: raise ValueError(f"Cannot identify data variable in {file_path} (HDF5)")
                     h = np.transpose(h)
 
             h = np.array(h, dtype=np.float32)
             
-            # Ensure shape is (T, X, Y)
+            # DEBUG: Print shape
+            print(f"DEBUG: Loaded file {file_path.name}, shape={h.shape}, size={h.nbytes / 1024**3:.2f} GB")
+
             if h.ndim == 2:
                 h = h[np.newaxis, :, :]
             
-            # Create input-output pairs with sliding window
-            total_steps = h.shape[0]
-            required_steps = self. input_steps + self.output_steps
+            # Store the raw big array in cache (efficient shared memory)
+            self.data_cache.append(h)
             
+            # Calculate valid start indices
+            total_steps = h.shape[0]
+            required_steps = self.input_steps + self.output_steps
+            
+            # Create metadata tuple (file_idx, start_time_idx)
             for start_idx in range(0, total_steps - required_steps + 1, self.stride):
-                input_seq = h[start_idx:start_idx + self. input_steps]
-                output_seq = h[start_idx + self.input_steps: 
-                              start_idx + self.input_steps + self.output_steps]
-                
-                # Extract prediction region for output
-                output_seq = output_seq[
-                    : , 
-                    self. pred_start:self.pred_end, 
-                    self.pred_start:self.pred_end
-                ]
-                
-                self.samples.append({
-                    'x': torch.from_numpy(input_seq),
-                    'y': torch.from_numpy(output_seq),
-                })
+                self.sample_metadata.append((file_idx, start_idx))
         
-        logger.info(f"Loaded {len(self.samples)} samples from {len(self.data_files)} files")
+        logger.info(f"Loaded metadata for {len(self.sample_metadata)} samples from {len(self.data_files)} files. Data kept in shared cache.")
     
     def __len__(self):
-        return len(self.samples)
+        return len(self.sample_metadata)
     
     def __getitem__(self, idx):
-        sample = self. samples[idx]
+        file_idx, start_idx = self.sample_metadata[idx]
+        
+        # Access raw data from cache
+        h = self.data_cache[file_idx]
+        
+        # Slice on-the-fly (Zero-Copy usually for numpy slice)
+        input_seq = h[start_idx : start_idx + self.input_steps]
+        output_seq = h[start_idx + self.input_steps : start_idx + self.input_steps + self.output_steps]
+        
+        # Extract prediction region
+        output_seq = output_seq[:, self.pred_start:self.pred_end, self.pred_start:self.pred_end]
+        
+        sample = {
+            'x': torch.from_numpy(input_seq), # Creates tensor, might copy
+            'y': torch.from_numpy(output_seq), 
+        }
         
         if self.transform:
             sample = self.transform(sample)
@@ -262,8 +261,25 @@ def load_sea_surface_data(
     test_dataset = torch.utils.data.Subset(full_dataset, test_indices)
     
     # Compute normalization statistics from training data
-    train_inputs = torch.stack([full_dataset. samples[i]['x'] for i in train_indices])
-    train_outputs = torch.stack([full_dataset.samples[i]['y'] for i in train_indices])
+    # IMPORTANT: Do NOT stack all samples, as this duplicates memory (OOM). 
+    # Use a random subset to estimate statistics.
+    # 100 samples is enough for decent mean/std estimation
+    subset_size = min(100, len(train_indices))
+    subset_indices = train_indices[:subset_size] # Since indices are already randomized by randperm
+    
+    # Efficient loading for stats
+    train_inputs = []
+    train_outputs = []
+    for i in subset_indices:
+        # Manually get item to avoid transform overhead if any, though here transform is None usually
+        sample = full_dataset[i]
+        train_inputs.append(sample['x'])
+        train_outputs.append(sample['y'])
+    
+    train_inputs = torch.stack(train_inputs)
+    train_outputs = torch.stack(train_outputs)
+    
+    logger.info(f"Computed Normalizer stats using {subset_size} samples.")
     
     in_normalizer = None
     out_normalizer = None
